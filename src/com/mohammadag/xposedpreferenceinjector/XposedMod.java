@@ -66,15 +66,16 @@ public class XposedMod implements IXposedHookLoadPackage {
 				for (ApplicationInfo info : xposedModulesList) {
 					Intent intent = getSettingsIntent(pm, info.packageName);
 					if (intent != null) {
-
 						Header header = new Header();
 						header.title = info.loadLabel(pm);
 						header.iconRes = android.R.drawable.sym_def_app_icon;
+						header.intent = intent;
+
 						Bundle extras = new Bundle();
 						extras.putString("xposed_package_name", info.packageName);
-						extras.putBoolean("xposed_module", true);
+						extras.putBoolean("xposed_module", true);	
 						header.extras = extras;
-						header.intent = intent;
+
 						headers.add(header);
 					}
 				}
