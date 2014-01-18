@@ -12,22 +12,35 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.XModuleResources;
 import android.os.Bundle;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceActivity.Header;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
-public class XposedMod implements IXposedHookLoadPackage {
+public class XposedMod implements IXposedHookLoadPackage, IXposedHookZygoteInit {
 
 	private static final String SETTINGS_CATEGORY = "de.robv.android.xposed.category.MODULE_SETTINGS";
 	private static Header mXposedHeader = null;
+	private static String mModulesTitle;
+
+	@Override
+	public void initZygote(StartupParam startupParam) throws Throwable {
+		XModuleResources resources = XModuleResources.createInstance(startupParam.modulePath, null);
+		mModulesTitle = resources.getString(R.string.xposed_modules);
+
+		if (TextUtils.isEmpty(mModulesTitle))
+			mModulesTitle = "Xposed Modules";
+	}
 
 	@Override
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
@@ -42,7 +55,7 @@ public class XposedMod implements IXposedHookLoadPackage {
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 				List<Header> headers = (List<Header>) param.args[0];
 				mXposedHeader= new Header();
-				mXposedHeader.title = "Xposed Modules";
+				mXposedHeader.title = mModulesTitle;
 				headers.add(mXposedHeader);
 
 				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
