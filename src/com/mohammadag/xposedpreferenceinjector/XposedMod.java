@@ -42,7 +42,8 @@ public class XposedMod implements IXposedHookLoadPackage {
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 				List<Header> headers = (List<Header>) param.args[0];
 				mXposedHeader= new Header();
-				mXposedHeader.title = "Xposed Modules";
+				String mXposedModulesTitle = getResources().getString(R.string.xposed_modules);
+				mXposedHeader.title = mXposedModulesTitle;
 				headers.add(mXposedHeader);
 
 				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
