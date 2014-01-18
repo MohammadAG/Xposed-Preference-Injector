@@ -76,18 +76,16 @@ public class XposedMod implements IXposedHookLoadPackage, IXposedHookZygoteInit 
 
 				Collections.sort(xposedModulesList, new ApplicationInfo.DisplayNameComparator(pm)); 
 
+				ApplicationInfo xposedInstaller = pm.getApplicationInfo("de.robv.android.xposed.installer", 0);
+				Header xposedInstallerHeader = getHeaderFromAppInfo(pm, xposedInstaller);
+				xposedInstallerHeader.intent = pm.getLaunchIntentForPackage(xposedInstaller.packageName);
+				headers.add(xposedInstallerHeader);
+
 				for (ApplicationInfo info : xposedModulesList) {
 					Intent intent = getSettingsIntent(pm, info.packageName);
 					if (intent != null) {
-						Header header = new Header();
-						header.title = info.loadLabel(pm);
-						header.iconRes = android.R.drawable.sym_def_app_icon;
+						Header header = getHeaderFromAppInfo(pm, info);
 						header.intent = intent;
-
-						Bundle extras = new Bundle();
-						extras.putString("xposed_package_name", info.packageName);
-						extras.putBoolean("xposed_module", true);	
-						header.extras = extras;
 
 						headers.add(header);
 					}
@@ -135,4 +133,16 @@ public class XposedMod implements IXposedHookLoadPackage, IXposedHookZygoteInit 
 		return intent;
 	}
 
+	private static Header getHeaderFromAppInfo(PackageManager pm, ApplicationInfo info) {
+		Header header = new Header();
+		header.title = info.loadLabel(pm);
+		header.iconRes = android.R.drawable.sym_def_app_icon;
+
+		Bundle extras = new Bundle();
+		extras.putString("xposed_package_name", info.packageName);
+		extras.putBoolean("xposed_module", true);	
+		header.extras = extras;
+
+		return header;
+	}
 }
