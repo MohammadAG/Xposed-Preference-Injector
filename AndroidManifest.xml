@@ -20,7 +20,7 @@
             android:value="30+" />
         <meta-data
             android:name="xposeddescription"
-            android:value="Inject Xposed module preferences into (close-to) stock Settings app" />
+            android:value="@string/xposed_description" />
     </application>
 
 </manifest>
