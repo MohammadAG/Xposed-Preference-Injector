@@ -1,5 +1,7 @@
 <resources>
 
+    <string name="app_name">Xposed Preference Injector</string>
     <string name="xposed_modules">Xposed Moduly</string>
+    <string name="xposed_description">Inject Xposed module preferences into (close-to) stock Settings app"</string>
 
 </resources>
