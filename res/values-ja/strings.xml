@@ -1,0 +1,5 @@
+<resources>
+
+    <string name="xposed_modules">Xposedモジュール</string>
+
+</resources>
