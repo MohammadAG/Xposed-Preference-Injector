@@ -3,44 +3,37 @@ package com.mohammadag.xposedpreferenceinjector;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 import static de.robv.android.xposed.XposedHelpers.findClass;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import android.content.Intent;
+import android.app.Activity;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.content.res.XModuleResources;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceActivity.Header;
-import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import de.robv.android.xposed.IXposedHookLoadPackage;
-import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
-public class XposedMod implements IXposedHookLoadPackage, IXposedHookZygoteInit {
-
-	private static final String SETTINGS_CATEGORY = "de.robv.android.xposed.category.MODULE_SETTINGS";
-	private static Header mXposedHeader = null;
-	private static String mModulesTitle;
-
-	@Override
-	public void initZygote(StartupParam startupParam) throws Throwable {
-		XModuleResources resources = XModuleResources.createInstance(startupParam.modulePath, null);
-		mModulesTitle = resources.getString(R.string.xposed_modules);
-
-		if (TextUtils.isEmpty(mModulesTitle))
-			mModulesTitle = "Xposed Modules";
-	}
+public class XposedMod implements IXposedHookLoadPackage {
+	@SuppressWarnings("unused")
+	private static final String TAG = "InjectXposedPreference";
+	private static final String KEY_LOADER = "ModuleLoader";
+	private static final String KEY_HEADER_LIST = "HeaderList";
+	private static Header sSectionHeader;
+	private static Header sMoreHeader;
+	private static WeakReference<Resources> sRefResources;
 
 	@Override
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
@@ -49,100 +42,178 @@ public class XposedMod implements IXposedHookLoadPackage, IXposedHookZygoteInit 
 
 		Class<?> SettingsClazz = findClass("com.android.settings.Settings", lpparam.classLoader);
 		final Class<?> HeaderAdapter = findClass("com.android.settings.Settings$HeaderAdapter", lpparam.classLoader);
+
+		findAndHookMethod(SettingsClazz, "onCreate", Bundle.class, new XC_MethodHook() {
+			@Override
+			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
+
+				List<Header> appsHeader = new ArrayList<Header>();
+				XposedHelpers.setAdditionalInstanceField(activity, KEY_HEADER_LIST, appsHeader);
+
+				ModuleLoader loader = new ModuleLoader(activity, appsHeader);
+				XposedHelpers.setAdditionalInstanceField(activity, KEY_LOADER, loader);
+			}
+		});
+
+		XposedHelpers.findAndHookMethod(SettingsClazz, "onResume", new XC_MethodHook() {
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
+				ModuleLoader loader = (ModuleLoader) XposedHelpers.getAdditionalInstanceField(activity, KEY_LOADER);
+				loader.updateModuleList();
+				loader.startObserver();
+			}
+		});
+
+		XposedHelpers.findAndHookMethod(SettingsClazz, "onPause", new XC_MethodHook() {
+
+			@Override
+			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
+				ModuleLoader loader = (ModuleLoader) XposedHelpers.getAdditionalInstanceField(activity, KEY_LOADER);
+				loader.stopTask();
+				loader.stopObserver();
+			}
+		});
+
 		XposedBridge.hookAllMethods(SettingsClazz, "updateHeaderList", new XC_MethodHook() {
 			@SuppressWarnings("unchecked")
 			@Override
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				List<Header> headers = (List<Header>) param.args[0];
-				mXposedHeader= new Header();
-				mXposedHeader.title = mModulesTitle;
-				headers.add(mXposedHeader);
-
 				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
-				PackageManager pm = activity.getPackageManager();
+				List<Header> headers = (List<Header>) param.args[0];
+				List<Header> appsHeader = (List<Header>) XposedHelpers.getAdditionalInstanceField(activity,
+						KEY_HEADER_LIST);
+				if (appsHeader == null)
+					appsHeader = new ArrayList<Header>();
 
-				/* This will slow down Settings app loading till we async-it!!! */
-				ArrayList<ApplicationInfo> xposedModulesList = new ArrayList<ApplicationInfo>();
-
-				for (PackageInfo pkg : activity.getPackageManager().getInstalledPackages(PackageManager.GET_META_DATA)) {
-					ApplicationInfo app = pkg.applicationInfo;
-					if (!app.enabled)
-						continue;
-
-					if (app.metaData != null && app.metaData.containsKey("xposedmodule")) {
-						xposedModulesList.add(app);
-					}
+				// Find headerIndex
+				int headerIndex = findHeaderIndex(activity, headers, "system_section");
+				if (headerIndex == -1) {
+					headerIndex = headers.size();
+				} else {
+					// Inject BEFORE this section.
+					headerIndex--;
 				}
 
-				Collections.sort(xposedModulesList, new ApplicationInfo.DisplayNameComparator(pm)); 
-
-				ApplicationInfo xposedInstaller = pm.getApplicationInfo("de.robv.android.xposed.installer", 0);
-				Header xposedInstallerHeader = getHeaderFromAppInfo(pm, xposedInstaller);
-				xposedInstallerHeader.intent = pm.getLaunchIntentForPackage(xposedInstaller.packageName);
-				headers.add(xposedInstallerHeader);
-
-				for (ApplicationInfo info : xposedModulesList) {
-					Intent intent = getSettingsIntent(pm, info.packageName);
-					if (intent != null) {
-						Header header = getHeaderFromAppInfo(pm, info);
-						header.intent = intent;
-
-						headers.add(header);
-					}
+				// Add section
+				if (sSectionHeader == null) {
+					sSectionHeader = new Header();
+					sSectionHeader.title = getStringMyPackage(activity, R.string.xposed_modules, "Xposed Modules");
 				}
+				headers.add(headerIndex++, sSectionHeader);
+
+				// Add apps header
+				headers.addAll(headerIndex++, appsHeader);
+				headerIndex += appsHeader.size() - 1;
+
+				// Add more header
+				if (sMoreHeader == null) {
+					PackageManager pm = activity.getPackageManager();
+					sMoreHeader = new Header();
+					String moreText = getStringSettingsPackage(activity, "wifi_more", "More...");
+					sMoreHeader.title = moreText;
+					sMoreHeader.iconRes = android.R.color.transparent;
+					sMoreHeader.intent = pm.getLaunchIntentForPackage("de.robv.android.xposed.installer");
+				}
+				headers.add(headerIndex++, sMoreHeader);
 
 				param.args[0] = headers;
 			}
 		});
 
-		/* We can only pass resIds above, so we override the getView method to load the icon manually */
+		/*
+		 * We can only pass resIds above, so we override the getView method to
+		 * load the icon manually
+		 */
 		findAndHookMethod(HeaderAdapter, "getView", int.class, View.class, ViewGroup.class, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				Header header = (Header) XposedHelpers.callMethod(param.thisObject, "getItem", param.args[0]);
+				BaseAdapter adapter = (BaseAdapter) param.thisObject;
+				Header header = (Header) adapter.getItem((Integer) param.args[0]);
 				if (header.extras != null) {
 					boolean isXposedModule = header.extras.getBoolean("xposed_module", false);
 					if (isXposedModule) {
 						String packageName = header.extras.getString("xposed_package_name");
 						View view = (View) param.getResult();
 						ImageView icon = (ImageView) XposedHelpers.getObjectField(view.getTag(), "icon");
+						// TODO Move to async
 						icon.setImageDrawable(view.getContext().getPackageManager().getApplicationIcon(packageName));
 					}
 				}
 			}
 		});
+
 	}
 
-	/* Taken from Xposed Installer */
-	private static Intent getSettingsIntent(PackageManager pm, String packageName) {
-		// taken from ApplicationPackageManager.getLaunchIntentForPackage(String)
-		// first looks for an Xposed-specific category, falls back to getLaunchIntentForPackage
-
-		Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
-		intentToResolve.addCategory(SETTINGS_CATEGORY);
-		intentToResolve.setPackage(packageName);
-		List<ResolveInfo> ris = pm.queryIntentActivities(intentToResolve, 0);
-
-		if (ris == null || ris.size() <= 0) {
-			return pm.getLaunchIntentForPackage(packageName);
-		}
-
-		Intent intent = new Intent(intentToResolve);
-		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		intent.setClassName(ris.get(0).activityInfo.packageName, ris.get(0).activityInfo.name);
-		return intent;
+	static Header getHeaderFromAppInfo(PackageManager pm, ApplicationInfo info) {
+		return getHeaderFromAppInfo(pm, info, null);
 	}
 
-	private static Header getHeaderFromAppInfo(PackageManager pm, ApplicationInfo info) {
+	public static Header getHeaderFromAppInfo(PackageManager pm, ApplicationInfo info, String title) {
 		Header header = new Header();
-		header.title = info.loadLabel(pm);
+		header.title = (title == null) ? info.loadLabel(pm) : title;
 		header.iconRes = android.R.drawable.sym_def_app_icon;
 
 		Bundle extras = new Bundle();
 		extras.putString("xposed_package_name", info.packageName);
-		extras.putBoolean("xposed_module", true);	
+		extras.putBoolean("xposed_module", true);
 		header.extras = extras;
 
 		return header;
 	}
+
+	public static String getStringSettingsPackage(Activity activity, String name, String def_text) {
+		Resources res = activity.getResources();
+		try {
+			int resId = res.getIdentifier(name, "string", activity.getPackageName());
+			if (resId == 0)
+				return def_text;
+			return res.getString(resId);
+		} catch (Exception e) {
+			return def_text;
+		}
+	}
+
+	public static String getStringMyPackage(Context context, int resId, String def_text) {
+		Resources res;
+		if (sRefResources == null || sRefResources.get() == null) {
+			PackageManager pm = context.getPackageManager();
+			try {
+				res = pm.getResourcesForApplication(XposedMod.class.getPackage().getName());
+			} catch (NameNotFoundException e) {
+				return def_text;
+			}
+			sRefResources = new WeakReference<Resources>(res);
+		} else {
+			res = sRefResources.get();
+		}
+		try {
+			return res.getString(resId);
+		} catch (Exception e) {
+			return def_text;
+		}
+	}
+
+	public static int findHeaderIndex(Activity activity, List<Header> headers, String headerName) {
+		int headerIndex = -1;
+		int resId = activity.getResources().getIdentifier(headerName, "id", activity.getPackageName());
+		if (resId != 0) {
+			int i = 0;
+			int size = headers.size();
+			while (i < size) {
+				Header header = headers.get(i);
+				int id = (int) header.id;
+				if (id == resId) {
+					headerIndex = i + 1;
+					break;
+				}
+				i++;
+			}
+		}
+		return headerIndex;
+
+	}
+
 }
