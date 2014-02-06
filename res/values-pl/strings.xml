@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Xposed Preference Injector</string>
+    <string name="xposed_modules">Moduły Xposed</string>
+    <string name="xposed_description">Osadza ustawienia modułów Xposed w aplikacji Ustawienia</string>
+</resources>
