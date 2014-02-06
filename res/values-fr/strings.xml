@@ -2,6 +2,6 @@
 
     <string name="app_name">Xposed Preference Injector</string>
     <string name="xposed_modules">Modules Xposed</string>
-    <string name="xposed_description">Ajoute des raccourcis des modules Xposed dans l'application Paramètres</string>
+    <string name="xposed_description">Ajoute des raccourcis des modules Xposed dans l\'application Paramètres</string>
 
 </resources>
