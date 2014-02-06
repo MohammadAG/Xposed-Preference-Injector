@@ -2,6 +2,6 @@
 
     <string name="app_name">Xposed Preference Injector</string>
     <string name="xposed_modules">Xposedモジュール</string>
-	<string name="xposed_description">Inject Xposed module preferences into (close-to) stock Settings app"</string>
+	<string name="xposed_description">Xposedモジュールの設定をシステムの設定に追加します。"</string>
     
 </resources>
