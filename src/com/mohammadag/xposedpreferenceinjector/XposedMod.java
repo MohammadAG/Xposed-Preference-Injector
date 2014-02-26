@@ -112,7 +112,9 @@ public class XposedMod implements IXposedHookLoadPackage {
 				if (sMoreHeader == null) {
 					PackageManager pm = activity.getPackageManager();
 					sMoreHeader = new Header();
-					String moreText = getStringSettingsPackage(activity, "wifi_more", "More...");
+					String moreText = getStringSettingsPackage(activity, "wifi_more", "More…");
+					if (!moreText.endsWith("…"))
+						moreText += "…";
 					sMoreHeader.title = moreText;
 					sMoreHeader.iconRes = android.R.color.transparent;
 					sMoreHeader.intent = pm.getLaunchIntentForPackage("de.robv.android.xposed.installer");
@@ -138,6 +140,7 @@ public class XposedMod implements IXposedHookLoadPackage {
 						String packageName = header.extras.getString("xposed_package_name");
 						View view = (View) param.getResult();
 						ImageView icon = (ImageView) XposedHelpers.getObjectField(view.getTag(), "icon");
+						icon.setAdjustViewBounds(true);
 						// TODO Move to async
 						icon.setImageDrawable(view.getContext().getPackageManager().getApplicationIcon(packageName));
 					}
