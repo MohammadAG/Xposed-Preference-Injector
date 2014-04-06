@@ -7,6 +7,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -82,6 +83,19 @@ public class XposedMod implements IXposedHookLoadPackage {
 			@Override
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 				PreferenceActivity activity = (PreferenceActivity) param.thisObject;
+
+				try {
+					ActionBar actionBar = activity.getActionBar();
+					if (actionBar.getNavigationMode() == ActionBar.NAVIGATION_MODE_TABS) {
+						// A Samsung
+						if (actionBar.getSelectedNavigationIndex() != actionBar.getNavigationItemCount() - 1) {
+							return;
+						}
+					}
+				} catch (Throwable t) {
+
+				}
+
 				List<Header> headers = (List<Header>) param.args[0];
 				List<Header> appsHeader = (List<Header>) XposedHelpers.getAdditionalInstanceField(activity,
 						KEY_HEADER_LIST);
