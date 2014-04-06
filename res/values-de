@@ -1,0 +1,7 @@
+<resources>
+
+    <string name="app_name">Xposed Preference Injector</string>
+    <string name="xposed_modules">Xposed Modules</string>
+    <string name="xposed_description">Füge heruntergeladene Xposed Modules in die (fast) Standard Einstellungen-App"</string>
+
+</resources>
