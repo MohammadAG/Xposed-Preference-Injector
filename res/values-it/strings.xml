@@ -1,0 +1,7 @@
+<resources>
+
+    <string name="app_name">Xposed Preference Injector</string>
+    <string name="xposed_modules">Moduli Xposed</string>
+    <string name="xposed_description">Aggiunge delle scorciatoie ai moduli Xposed nell\'app Impostazioni"</string>
+
+</resources>
