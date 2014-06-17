@@ -1,0 +1,7 @@
+<resources>
+
+    <string name="app_name">Xposed Preference Injector</string>
+    <string name="xposed_modules">Модули Xposed</string>
+    <string name="xposed_description">Отображение модулей Xposed в системном приложении настроек</string>
+
+</resources>
